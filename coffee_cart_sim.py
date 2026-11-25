@@ -110,3 +110,31 @@ if __name__ == "__main__":
     print(f"Operating profit: median {statistics.median(ops):,.0f} | p10 {ops[N//10]:,.0f} | p90 {ops[9*N//10]:,.0f}")
     print(f"Net after setup costs (kit resold at 35%): median {statistics.median(nets):,.0f} | p10 {nets[N//10]:,.0f} | p90 {nets[9*N//10]:,.0f}")
     print(f"Years profitable (net>0): {sum(n>0 for n in nets)/N:.0%} | ran out of cash: {sum(x['min_cash']<0 for x in res)/N:.0%}")
+
+
+# ---- Israeli self-employed taxes (APPROXIMATE, verify with an accountant) ----
+def taxes(op_profit):
+    accountant = 3000                      # bookkeeping / annual reports
+    deductible = 2700 + 0.20 * 12000       # permit+branding + 20% depreciation on kit
+    taxable = max(0, op_profit - accountant - deductible)
+    brackets = [(84120, .10), (120720, .14), (193800, .20), (269280, .31), (560280, .35), (1e12, .47)]
+    tax, prev = 0, 0
+    for top, rate in brackets:
+        if taxable > prev: tax += (min(taxable, top) - prev) * rate
+        prev = top
+    tax = max(0, tax - 2.25 * 2904)        # tax credit points
+    ni = min(taxable, 99000) * 0.0597 + max(0, min(taxable, 560000) - 99000) * 0.1783  # NI + health
+    return accountant, tax, ni
+
+if __name__ == "__main__":
+    res = [run(s) for s in range(500)]
+    out = []
+    for x in res:
+        acc, tax, ni = taxes(x["op_profit"])
+        out.append(x["op_profit"] - acc - tax - ni)
+    out.sort()
+    a, t, n = taxes(statistics.median(x["op_profit"] for x in res))
+    print(f"\n== After accountant+income tax+national insurance ==")
+    print(f"At median profit: accountant {a:,.0f} | income tax {t:,.0f} | NI+health {n:,.0f}")
+    print(f"Take-home profit (before any owner salary draw is 'cost'): median {statistics.median(out):,.0f} | p10 {out[50]:,.0f} | p90 {out[450]:,.0f}")
+    print(f"Per month: {statistics.median(out)/12:,.0f}")
