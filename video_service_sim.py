@@ -44,7 +44,7 @@ def run(seed, strategy, H=10.0):
         hours_day = H * eff if working else 0.0
         # outsourcing
         out = 0.0
-        if strategy == "scale" and total_need > 0.7 * H * 0.65 * 26:
+        if strategy in ("scale", "reinvest") and total_need > 0.7 * H * 0.65 * 26:
             out = min(0.85, 1 - (0.7 * H * 0.65 * 26 - 2 * len(clients)) / max(1, total_need - 2 * len(clients)))
             out = max(out, 0.0)
         own_need_day = (total_need - out * len(clients) * REELS_PER_CLIENT * edit_h + (0.5 * len(clients) if out > 0 else 0)) / 26
@@ -64,6 +64,11 @@ def run(seed, strategy, H=10.0):
         port = min(1.0, portfolio_h / 300)
         calls += binom(r, 1, min(1, (0.010 + 0.10 * port) * trust * CAL))                    # inbound
         calls += binom(r, 1, min(1, len(clients) * 0.05 / 30 * 3)) if clients else 0  # referrals
+        if strategy == "reinvest" and working:      # no living costs -> plow spare cash into paid leads
+            ad = min(2500, 0.25 * max(0, cash - 5000)) / 26
+            if ad > 0:
+                cash -= ad * 1.17; tools += ad * 1.17; m_cost += ad * 1.17      # exempt dealer can't reclaim VAT
+                calls += binom(r, 5, min(1, ad / 100 / 5 * CAL))                # ~100 NIS per booked call
         if working and not full:
             for _ in range(calls):
                 price = min(4000, max(500, r.lognormvariate(math.log(450 + 700 * q), 0.30)))
@@ -107,7 +112,7 @@ def summarize(strategy, H=10.0, N=800, show=True):
 
 if __name__ == "__main__":
     print(f"Setup {SETUP_TOTAL:,} | cash kept as buffer {RESERVE:,} | (net = after income tax and setup)\n")
-    summarize("solo"); summarize("scale")
+    summarize("solo"); summarize("scale"); summarize("reinvest")
     print("\n-- hours sensitivity (SCALE) --")
     for h in (10, 6, 4, 2): summarize("scale", h)
     print("\n-- sensitivity to how well cold outreach converts (SCALE, 10h) --")
